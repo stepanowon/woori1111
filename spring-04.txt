@@ -1,0 +1,376 @@
+* slide-21 
+[[Maven Dependency]]
+<dependency>
+  <groupId>com.fasterxml.jackson.dataformat</groupId>
+  <artifactId>jackson-dataformat-xml</artifactId>
+</dependency>
+
+
+* slide-23
+@JacksonXmlRootElement(localName = "result")
+public class Result {
+    private String status;
+    private String message;
+    private String key;
+	
+    //getter, setter, constructor 생략
+}
+
+* slide-24
+@JacksonXmlRootElement(localName = "contact")
+public class Contact {
+	@JacksonXmlProperty(isAttribute = true)
+	private long no;
+	private String name;
+	private String tel;
+	private String address;
+
+	//getter, setter, constructor 생략
+}
+
+* slide-25
+@JacksonXmlRootElement(localName = "contactList")
+public class ContactList {
+	private int pageNo;
+	private int pageSize;
+	private int totalCount;
+	@JacksonXmlElementWrapper(localName = "contacts")
+	@JacksonXmlProperty(localName = "contact")
+	private List<Contact> contacts;
+
+	//getter, setter, constructor 생략
+}
+
+* slide-26
+package com.multi.contactsapp.service;
+......
+@Service
+public class ContactService {
+  @Autowired
+  private ContactDAO contactDAO;
+  
+  public ContactList getContactList() {
+    List<Contact> contacts = contactDAO.getContactList();
+    ContactList contactList = new ContactList(0, 0, contacts.size(), contacts);
+    return contactList;
+  }
+  
+  public ContactList getContactList(int pageNo, int pageSize) {
+    List<Contact> contacts = contactDAO.getContactList(pageNo, pageSize);
+    int totalCount = contactDAO.getContactCount();    
+    ContactList contactList = new ContactList(pageNo, pageSize, totalCount, contacts);
+    return contactList;  
+  }
+
+  public Contact getContactOne(Contact c) {
+    return contactDAO.getContactOne(c);
+  }
+  
+  public Result insertContact(Contact c) {
+    Result result = new Result("ok", "", "");
+    try {
+      long no = contactDAO.insertContact(c);
+      result.setMessage("연락처 추가 성공. 추가된 연락처의 일련번호 :" + no);
+      result.setKey(""+no);
+    } catch (Exception ex) {
+      result.setStatus("fail");
+      result.setMessage(ex.getMessage());
+      result.setKey("");
+    }
+    return result;
+  }
+  
+  public Result updateContact(Contact c) {
+    Result result = new Result("ok", "", "");
+    try {
+      int count = contactDAO.updateContact(c);
+      result.setMessage(count + "건의 연락처 변경 성공");
+      result.setKey(c.getNo()+"");
+    } catch (Exception ex) {
+      result.setStatus("fail");
+      result.setMessage(ex.getMessage());
+      result.setKey("");
+    }
+    return result;
+  }
+  
+  public Result deleteContact(Contact c) {
+    Result result = new Result("ok", "", "");
+    try {
+      int count = contactDAO.deleteContact(c);
+      result.setMessage(count + "건의 연락처 삭제 성공");
+      result.setKey(c.getNo()+"");
+    } catch (Exception ex) {
+      result.setStatus("fail");
+      result.setMessage(ex.getMessage());
+      result.setKey("");
+    }
+    return result;
+  }
+}
+
+* slide-32
+package com.multi.contactsapp;
+......
+
+@RestController
+@RequestMapping(value="/contacts")
+public class ContactRestController {
+  @Autowired
+  private ContactService contactService;
+  
+  @GetMapping()
+  public ContactList getContactList(
+      @RequestParam(value="pageno", required=false, defaultValue="0") int pageNo, 
+      @RequestParam(value="pagesize", required=false, defaultValue="3") int pageSize) {
+    ContactList contactList = null;
+    if (pageNo < 1) {
+      contactList = contactService.getContactList();
+    } else {
+      if (pageSize < 2) pageSize = 5;
+      contactList = contactService.getContactList(pageNo, pageSize);
+    }
+    return contactList;
+  }
+
+  @GetMapping("{no}")
+  public Contact getContactOne(@PathVariable("no") int no) {
+    Contact c = new Contact();
+    c.setNo(no);
+    return contactService.getContactOne(c);
+  }
+  @PostMapping()
+  public Result insertContact(@RequestBody Contact c) {
+    return contactService.insertContact(c);
+  }
+  @PutMapping("{no}")
+  public Result updateContact(
+      @PathVariable("no") int no,
+      @RequestBody Contact c) {
+    c.setNo(no);
+    return contactService.updateContact(c);
+  }
+  @DeleteMapping("{no}")
+  public Result updateContact(@PathVariable("no") int no) {
+    Contact c = new Contact();
+    c.setNo(no);
+    return contactService.deleteContact(c);
+  }
+}
+
+* slide-37
+
+package com.multi.contactsapp;
+......
+
+@Configuration
+public class WebMvcConfig implements WebMvcConfigurer {
+
+  @Override
+  public void configureContentNegotiation(ContentNegotiationConfigurer configurer) {
+      configurer.defaultContentType(MediaType.APPLICATION_JSON)
+        .favorParameter(true).parameterName("output")
+        .ignoreAcceptHeader(false);
+  }  
+}
+
+* slide-40
+# static resources
+spring.mvc.static-path-pattern=/photos/**
+spring.web.resources.static-locations=classpath:/photos/,classpath:/photo-files/
+
+spring.mvc.static-path-pattern=/photos/**
+#spring.resources.static-locations=classpath:/photos/,classpath:/photo-files/
+spring.web.resources.static-locations=file:/httpresources/photos/
+
+
+* slide-41
+package com.multi.contactsapp;
+......
+@Configuration
+public class WebMvcConfig implements WebMvcConfigurer {
+  ......
+  @Override
+  public void addResourceHandlers(ResourceHandlerRegistry registry) {
+      registry
+        .addResourceHandler("/photos/**")
+        .addResourceLocations("classpath:/photos/", "file:///c:/temp2/")
+        .setCacheControl(CacheControl.maxAge(Duration.ofHours(12)));  
+  } 
+}
+
+
+* slide-43
+package com.multi.contactsapp.util;
+
+public class ApiException extends RuntimeException {
+  private static final long serialVersionUID = 1L;
+  private final String status;
+  
+  public ApiException(String message, String status) {
+    super(message);
+    this.status = status;
+  }
+  
+  public ApiException(String message) {
+    this(message, "100");
+  }
+  
+  public String getStatus(){
+    return this.status;
+  }
+}
+
+
+* slide-44
+package com.multi.contactsapp.util;
+......
+
+@JacksonXmlRootElement(localName="restApiError")
+public class ApiErrorInfo {
+  private String message;
+  private String status;
+  
+  public ApiErrorInfo() {
+    super();
+    // TODO Auto-generated constructor stub
+  }
+  public ApiErrorInfo(String message, String status) {
+    super();
+    this.message = message;
+    this.status = status;
+  }
+  public String getMessage() {
+    return message;
+  }
+  public void setMessage(String message) {
+    this.message = message;
+  }
+  public String getStatus() {
+    return status;
+  }
+  public void setStatus(String status) {
+    this.status = status;
+  }
+}
+
+* slide-45
+package com.multi.contactsapp;
+......
+@RestController
+@RequestMapping(value = "/test")
+public class TestController {
+   @GetMapping("error1")
+   public Contact getTestContactOne(@RequestParam(value = "name", required = false) String name) {
+      if (name == null || name.equals(""))
+          throw new ApiException("name 파라미터는 비워둘 수 없습니다.");
+      else
+         return new Contact(0, name, "", "");
+   }
+
+   @ExceptionHandler(value = { ApiException.class })
+   public ResponseEntity<ApiErrorInfo> handleCustomException(ApiException e) {
+      ApiErrorInfo error = new ApiErrorInfo("@ExceptionHandler : " + e.getMessage(), e.getStatus());
+      ResponseEntity<ApiErrorInfo> entity = 
+         new ResponseEntity<ApiErrorInfo>(error, HttpStatus.BAD_REQUEST);
+      return entity;
+   }
+}
+
+* slide-47
+package com.multi.contactsapp.util;
+.......
+
+@ControllerAdvice
+public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
+
+  @ExceptionHandler(value={ ApiException.class })
+  @ResponseBody
+  public ResponseEntity<ApiErrorInfo> handleCustomException(ApiException e) {
+    ApiErrorInfo error = new ApiErrorInfo("@ControllerAdvice : " + e.getMessage(), e.getStatus());
+    ResponseEntity<ApiErrorInfo> entity = 
+          new ResponseEntity<ApiErrorInfo>(error, HttpStatus.BAD_REQUEST);
+    return entity;
+  }
+}
+
+
+* slide-59
+
+@CrossOrigin(origins={ "http://jcornor.com:8000" })
+@RequestMapping(method = RequestMethod.GET)
+public ContactList getContactList() {
+   return contactService.getContactList();
+}
+
+
+@CrossOrigin(origins={ "http://jcornor.com:8000" })
+@RestController
+@RequestMapping(value="contacts")
+public class ContactRestController {
+   @Autowired
+   private ContactService contactService;
+   @RequestMapping(method = RequestMethod.GET)
+   public ContactList getContactList() {
+      return contactService.getContactList();
+   }
+}
+
+* slide-60
+
+@Configuration
+public class WebMvcConfig implements WebMvcConfigurer {
+    @Override
+    public void addCorsMappings(CorsRegistry registry) {
+        registry.addMapping("/**");
+    }
+}
+
+@Override
+public void addCorsMappings(CorsRegistry registry) {
+   registry.addMapping("/contacts/**")
+      .allowedOrigins("http://client:8000","http://jcornor.com:8000")
+      .allowedMethods("GET","POST","PUT","DELETE","HEAD", "OPTIONS")
+      .allowCredentials(true)
+      .maxAge(3600);
+}
+
+* slide-61
+server.port=80
+--------------------------
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Insert title here</title>
+</head>
+<body>
+  <h2>Console Log를 확인합니다.</h2>
+  <script type="text/javascript" src="https://code.jquery.com/jquery.js"></script>
+  <script type="text/javascript">
+   let url = "http://server.com:8080/contacts?output=json";
+   $.get(url, function(data) {
+      console.log(data);
+   })
+  </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

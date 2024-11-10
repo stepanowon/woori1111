@@ -1,0 +1,130 @@
+* slide-02
+<dependency>
+    <groupId>org.springdoc</groupId>
+    <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+    <version>2.2.0</version>
+</dependency>
+
+
+* slide-03
+package com.multi.contactsapp;
+
+import org.springframework.context.annotation.Configuration;
+import io.swagger.v3.oas.annotations.OpenAPIDefinition;
+import io.swagger.v3.oas.annotations.info.Info;
+
+//@formatter:off
+@Configuration
+@OpenAPIDefinition(
+    info = @Info(
+        title = "연락처 서비스 문서화", 
+        description = "연락처 서비스 API에 대한 설명", 
+        version = "1.0"
+    )
+)
+public class SpringDocConfig { }
+//@formatter:on
+
+
+* slide-05
+<< application.properties 예시>>
+springdoc.api-docs.path=/api-docs
+springdoc.paths-to-match=/api/**
+springdoc.version=v1.0
+
+<< application.yml 예시>>
+springdoc:
+   paths-to-match: /api/**
+   api-docs:
+        path: /api-docs
+   version: v1.0
+
+
+* slide-07
+@Schema(title = "연락처 한건 정보")
+@JacksonXmlRootElement(localName = "contact")
+public class Contact {
+  @NotBlank
+  @Size(min = 0)
+  @Schema(title = "일련번호", example = "1001")
+  @JacksonXmlProperty(isAttribute = true)
+  private long no;
+  @NotNull
+  @Schema(title = "이름", example = "홍길동")
+  private String name;
+  @NotBlank
+  @Schema(title = "전화번호", example = "010-1111-2222")
+  @JacksonXmlProperty(localName = "phone")
+  private String tel;
+  @Schema(title = "주소", example = "서울시")
+  private String address;
+
+  ……  
+}
+
+
+* slide-08
+package com.multi.contactsapp;
+......
+@RestController
+@RequestMapping(value = "/contacts")
+@Tag(name = "연락처 API", description = "연락처 서비스 API 상세 설명")
+public class ContactRestController {
+  @Autowired
+  private ContactService contactService;
+  @Operation(
+      summary = "연락처 목록 조회", 
+      description = "페이징을 사용해 연락처 목록 조회", 
+      responses = {
+          @ApiResponse(responseCode = "200", description = "조회된 연락처 정보를 반환함."),
+          @ApiResponse(responseCode = "400", description = "API Exception 오류 발생")
+      }
+  )
+  @GetMapping()
+  public ContactList getContactList(
+      @Parameter(description = "페이지 번호", example = "2")
+        @RequestParam(value = "pageno", required = false, defaultValue = "0") int pageNo,
+      @Parameter(description = "페이지 사이즈", example = "3")
+        @RequestParam(value = "pagesize", required = false, defaultValue = "3") int pageSize) {
+    ContactList contactList = null;
+    if (pageNo < 1) {
+      contactList = contactService.getContactList();
+    } else {
+      if (pageSize < 2)
+        pageSize = 5;
+      contactList = contactService.getContactList(pageNo, pageSize);
+    }
+    return contactList;
+  }
+
+
+* slide-10
+ @Operation(
+      summary = "연락처 추가", 
+      description = "JSON/XML로 전달된 연락처 한건 정보를 추가함", 
+      responses = {
+          @ApiResponse(responseCode = "200", description = "추가 성공/실패 여부 응답, Result객체"),
+          @ApiResponse(responseCode = "400", description = "API Exception 오류 발생")
+      }
+  )
+  @PostMapping()
+   public Result insertContact(@Valid @RequestBody Contact c) {
+    String name = c.getName();
+    String tel = c.getTel();
+    if (name == null || name.equals("") || tel == null || tel.equals("")) {
+      throw new ApiException("이름과 전화번호는 필수 입력 항목입니다.", "102");
+    }
+    return contactService.insertContact(c);
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
